@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstring>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -165,105 +167,170 @@ std::string formatCurrency(double value) {
   return out.str();
 }
 
-std::string renderCommonStyles() {
-  return
-      "  <style>body{font-family:Segoe UI,Arial,sans-serif;margin:2rem;background:#f5f7fb;color:#1f2d3d;}"
-      "h1{margin-bottom:0.5rem;}"
-      ".lead{margin-bottom:1.5rem;color:#334155;}"
-      ".entry-form{background:#fff;padding:1rem;border-radius:8px;box-shadow:0 2px 6px rgba(15,23,42,0.15);max-width:520px;margin-bottom:2rem;}"
-      ".entry-form label{display:block;margin-bottom:0.5rem;font-weight:600;}"
-      ".entry-form input[type=text],.entry-form input[type=number]{width:100%;padding:0.5rem;margin-bottom:0.75rem;border:1px solid #cbd5f5;border-radius:6px;}"
-      ".primary-button{padding:0.6rem 1.2rem;background:#2563eb;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;}"
-      ".primary-button:hover{background:#1e40af;}"
-      "table{margin-top:2rem;width:100%;border-collapse:collapse;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,0.1);border-radius:8px;overflow:hidden;}"
-      "th,td{padding:0.75rem;border-bottom:1px solid #d9e3f5;text-align:left;}"
-      "th{background:#e2e8f8;}"
-      "tbody tr:nth-child(odd){background:#f8fbff;}"
-      "tfoot td{font-weight:700;}"
-      ".actions{width:1%;white-space:nowrap;}"
-      ".action-form{display:inline;}"
-      ".action-button{padding:0.35rem 0.9rem;background:#0ea5e9;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;}"
-      ".action-button:hover{background:#0284c7;}"
-      ".link-button{display:inline-block;margin-top:1rem;color:#2563eb;font-weight:600;text-decoration:none;}"
-      ".link-button:hover{text-decoration:underline;}"
-      "</style>\n";
+std::string formatCurrencyWithGrouping(double value) {
+  std::ostringstream out;
+  out << std::fixed << std::setprecision(2) << value;
+  std::string number = out.str();
+  const auto dotPos = number.find('.');
+  std::string integerPart = dotPos == std::string::npos ? number : number.substr(0, dotPos);
+  const std::string decimalPart = dotPos == std::string::npos ? std::string{} : number.substr(dotPos);
+
+  std::vector<std::string> groups;
+  for (std::ptrdiff_t end = static_cast<std::ptrdiff_t>(integerPart.size()); end > 0; end -= 3) {
+    const std::ptrdiff_t start = std::max<std::ptrdiff_t>(0, end - 3);
+    groups.emplace_back(integerPart.substr(static_cast<size_t>(start), static_cast<size_t>(end - start)));
+  }
+  std::reverse(groups.begin(), groups.end());
+
+  if (groups.empty()) {
+    groups.emplace_back("0");
+  }
+
+  std::string grouped = groups[0];
+  for (size_t index = 1; index < groups.size(); ++index) {
+    grouped += (index == 1 && groups.size() > 2) ? '\'' : ',';
+    grouped += groups[index];
+  }
+
+  return grouped + decimalPart;
+}
+
+std::string normalizeCostInput(const std::string& raw) {
+  std::string normalized;
+  normalized.reserve(raw.size());
+  for (char ch : raw) {
+    if (ch == '\'' || ch == ',' || std::isspace(static_cast<unsigned char>(ch))) {
+      continue;
+    }
+    normalized.push_back(ch);
+  }
+  return normalized;
+}
+
+std::string loadTemplateFile(const std::string& filename) {
+  const std::filesystem::path templatePath = std::filesystem::path("templates") / filename;
+  std::ifstream file(templatePath, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("No se pudo abrir la plantilla: " + templatePath.string());
+  }
+  std::ostringstream content;
+  content << file.rdbuf();
+  return content.str();
+}
+
+const std::string& indexTemplate() {
+  static const std::string templateContent = loadTemplateFile("index.html");
+  return templateContent;
+}
+
+const std::string& editTemplate() {
+  static const std::string templateContent = loadTemplateFile("edit.html");
+  return templateContent;
+}
+
+void replaceAll(std::string& target, const std::string& placeholder, const std::string& value) {
+  size_t position = 0U;
+  while ((position = target.find(placeholder, position)) != std::string::npos) {
+    target.replace(position, placeholder.size(), value);
+    position += value.size();
+  }
+}
+
+std::string renderTemplateError(const std::string& message) {
+  return std::string{"<html><body><h1>Error interno</h1><p>"} + escapeHtml(message) + "</p></body></html>";
+}
+
+std::string escapeCsv(const std::string& value) {
+  std::ostringstream out;
+  out << '"';
+  for (const char ch : value) {
+    if (ch == '"') {
+      out << "\"\"";
+    } else {
+      out << ch;
+    }
+  }
+  out << '"';
+  return out.str();
+}
+
+std::string loadStaticFile(const std::string& filename) {
+  const std::filesystem::path staticPath = std::filesystem::path("static") / filename;
+  std::ifstream file(staticPath, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("No se pudo abrir el activo estático: " + staticPath.string());
+  }
+  std::ostringstream content;
+  content << file.rdbuf();
+  return content.str();
+}
+
+const std::string& stylesAsset() {
+  static const std::string content = loadStaticFile("styles.css");
+  return content;
+}
+
+const std::string& formatterAsset() {
+  static const std::string content = loadStaticFile("formatter.js");
+  return content;
 }
 
 std::string renderItemsTable() {
-  std::ostringstream stream;
-  stream << "<!DOCTYPE html>\n"
-         << "<html lang=\"es\">\n"
-         << "<head>\n"
-         << "  <meta charset=\"utf-8\">\n"
-         << "  <title>Piloto de Monetización CSFJ</title>\n"
-         << renderCommonStyles()
-         << "</head>\n"
-         << "<body>\n"
-         << "  <h1>Piloto de Monetización CSFJ</h1>\n"
-         << "  <p class=\"lead\">Registra los items y sus costos asociados. Toda la información se mantiene en memoria mientras el servidor está activo.</p>\n"
-         << "  <form class=\"entry-form\" method=\"POST\" action=\"/submit\">\n"
-         << "    <label for=\"itemName\">Nombre del item</label>\n"
-         << "    <input id=\"itemName\" name=\"itemName\" type=\"text\" required maxlength=\"120\">\n"
-         << "    <label for=\"itemCost\">Costo</label>\n"
-         << "    <input id=\"itemCost\" name=\"itemCost\" type=\"number\" step=\"0.01\" min=\"0\" required>\n"
-         << "    <button class=\"primary-button\" type=\"submit\">Agregar</button>\n"
-         << "  </form>\n";
-
+  std::ostringstream rows;
   double totalCost = 0.0;
-  stream << "  <table>\n"
-         << "    <thead><tr><th>#</th><th>Item</th><th>Costo</th><th>Acciones</th></tr></thead>\n"
-         << "    <tbody>\n";
   {
     std::lock_guard<std::mutex> guard(g_itemsMutex);
     for (size_t index = 0; index < g_items.size(); ++index) {
       const Item& item = g_items[index];
-      stream << "      <tr><td>" << (index + 1) << "</td><td>" << escapeHtml(item.name)
-             << "</td><td>" << formatCurrency(item.cost)
-             << "</td><td class=\"actions\"><form class=\"action-form\" method=\"GET\" action=\"/edit\">"
-             << "<input type=\"hidden\" name=\"index\" value=\"" << index << "\">"
-             << "<button class=\"action-button\" type=\"submit\">Editar</button></form></td></tr>\n";
+      rows << "      <tr><td>" << (index + 1) << "</td><td>" << escapeHtml(item.name)
+           << "</td><td>" << formatCurrencyWithGrouping(item.cost)
+           << "</td><td class=\"actions\"><form class=\"action-form\" method=\"GET\" action=\"/edit\">"
+           << "<input type=\"hidden\" name=\"index\" value=\"" << index << "\">"
+           << "<button class=\"action-button\" type=\"submit\">Editar</button></form></td></tr>\n";
       totalCost += item.cost;
     }
   }
-  stream << "    </tbody>\n"
-         << "    <tfoot><tr><td colspan=\"3\">Total</td><td>" << formatCurrency(totalCost) << "</td></tr></tfoot>\n"
-         << "  </table>\n"
-         << "</body>\n"
-         << "</html>\n";
-  return stream.str();
+
+  std::string page;
+  try {
+    page = indexTemplate();
+  } catch (const std::exception& ex) {
+    return renderTemplateError(ex.what());
+  }
+
+  replaceAll(page, "{{items_rows}}", rows.str());
+  replaceAll(page, "{{total_cost}}", formatCurrencyWithGrouping(totalCost));
+
+  return page;
 }
 
 std::string renderEditPage(size_t index, const Item& item) {
-  std::ostringstream stream;
-  stream << "<!DOCTYPE html>\n"
-         << "<html lang=\"es\">\n"
-         << "<head>\n"
-         << "  <meta charset=\"utf-8\">\n"
-         << "  <title>Piloto de Monetización CSFJ — Editar item</title>\n"
-         << renderCommonStyles()
-         << "</head>\n"
-         << "<body>\n"
-         << "  <h1>Editar item</h1>\n"
-         << "  <p class=\"lead\">Actualiza la información del item seleccionado y guarda los cambios para que se reflejen en el listado.</p>\n"
-         << "  <form class=\"entry-form\" method=\"POST\" action=\"/update\">\n"
-         << "    <input type=\"hidden\" name=\"itemIndex\" value=\"" << index << "\">\n"
-         << "    <label for=\"itemName\">Nombre del item</label>\n"
-         << "    <input id=\"itemName\" name=\"itemName\" type=\"text\" required maxlength=\"120\" value=\"" << escapeHtml(item.name) << "\">\n"
-         << "    <label for=\"itemCost\">Costo</label>\n"
-         << "    <input id=\"itemCost\" name=\"itemCost\" type=\"number\" step=\"0.01\" min=\"0\" required value=\"" << formatCurrency(item.cost) << "\">\n"
-         << "    <button class=\"primary-button\" type=\"submit\">Guardar cambios</button>\n"
-         << "  </form>\n"
-         << "  <a class=\"link-button\" href=\"/\">Cancelar y volver al listado</a>\n"
-         << "</body>\n"
-         << "</html>\n";
-  return stream.str();
+  std::string page;
+  try {
+    page = editTemplate();
+  } catch (const std::exception& ex) {
+    return renderTemplateError(ex.what());
+  }
+
+  replaceAll(page, "{{item_index}}", std::to_string(index));
+  replaceAll(page, "{{item_name}}", escapeHtml(item.name));
+  replaceAll(page, "{{item_cost}}", formatCurrency(item.cost));
+
+  return page;
 }
 
-void sendResponse(SOCKET client, const std::string& statusLine, const std::string& contentType, const std::string& body) {
+void sendResponse(SOCKET client,
+                  const std::string& statusLine,
+                  const std::string& contentType,
+                  const std::string& body,
+                  const std::string& extraHeaders = std::string{}) {
   std::ostringstream response;
   response << statusLine << "\r\n"
-           << "Content-Type: " << contentType << "\r\n"
-           << "Content-Length: " << body.size() << "\r\n"
+           << "Content-Type: " << contentType << "\r\n";
+  if (!extraHeaders.empty()) {
+    response << extraHeaders;
+  }
+  response << "Content-Length: " << body.size() << "\r\n"
            << "Connection: close\r\n\r\n"
            << body;
   const auto payload = response.str();
@@ -280,6 +347,24 @@ void sendRedirect(SOCKET client, const std::string& location) {
   send(client, payload.data(), static_cast<int>(payload.size()), 0);
 }
 
+bool tryServeStaticAsset(const std::string& path, SOCKET client) {
+  try {
+    if (path == "/static/styles.css") {
+      sendResponse(client, "HTTP/1.1 200 OK", "text/css; charset=utf-8", stylesAsset());
+      return true;
+    }
+    if (path == "/static/formatter.js") {
+      sendResponse(client, "HTTP/1.1 200 OK", "application/javascript; charset=utf-8", formatterAsset());
+      return true;
+    }
+  } catch (const std::exception& ex) {
+    const auto errorPage = renderTemplateError(ex.what());
+    sendResponse(client, "HTTP/1.1 500 Internal Server Error", "text/html; charset=utf-8", errorPage);
+    return true;
+  }
+  return false;
+}
+
 void handlePostSubmit(const std::string& body, SOCKET client) {
   const auto formValues = parseFormBody(body);
   const auto nameIt = formValues.find("itemName");
@@ -290,7 +375,11 @@ void handlePostSubmit(const std::string& body, SOCKET client) {
     return;
   }
   try {
-    const double cost = std::stod(costIt->second);
+    const std::string normalizedCost = normalizeCostInput(costIt->second);
+    if (normalizedCost.empty()) {
+      throw std::invalid_argument("empty");
+    }
+    const double cost = std::stod(normalizedCost);
     if (cost < 0.0) {
       throw std::invalid_argument("negative");
     }
@@ -326,7 +415,11 @@ void handlePostUpdate(const std::string& body, SOCKET client) {
   }
 
   try {
-    const double cost = std::stod(costIt->second);
+    const std::string normalizedCost = normalizeCostInput(costIt->second);
+    if (normalizedCost.empty()) {
+      throw std::invalid_argument("empty");
+    }
+    const double cost = std::stod(normalizedCost);
     if (cost < 0.0) {
       throw std::invalid_argument("negative");
     }
@@ -433,9 +526,31 @@ void handleClient(SOCKET client) {
     }
   }
 
+  if (method == "GET" && tryServeStaticAsset(path, client)) {
+    return;
+  }
+
   if (method == "GET" && (path == "/" || path == "/index.html")) {
     const auto html = renderItemsTable();
     sendResponse(client, "HTTP/1.1 200 OK", "text/html; charset=utf-8", html);
+  } else if (method == "GET" && path == "/export") {
+    std::ostringstream csv;
+    csv << "Nombre,Costo\r\n";
+
+    double totalCost = 0.0;
+    {
+      std::lock_guard<std::mutex> guard(g_itemsMutex);
+      for (const Item& item : g_items) {
+        csv << escapeCsv(item.name) << ',' << escapeCsv(formatCurrency(item.cost)) << "\r\n";
+        totalCost += item.cost;
+      }
+    }
+
+    csv << escapeCsv("Total") << ',' << escapeCsv(formatCurrency(totalCost)) << "\r\n";
+
+    const auto csvBody = csv.str();
+    const std::string disposition = "Content-Disposition: attachment; filename=\"items.csv\"\r\n";
+    sendResponse(client, "HTTP/1.1 200 OK", "text/csv; charset=utf-8", csvBody, disposition);
   } else if (method == "GET" && path == "/edit") {
     const auto queryValues = parseFormBody(queryString);
     const auto indexIt = queryValues.find("index");

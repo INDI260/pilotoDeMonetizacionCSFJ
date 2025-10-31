@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Piloto de Monetización CSFJ</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <h1>Piloto de Monetización CSFJ</h1>
+  <p class="lead">Registra los items y sus costos asociados. Toda la información se mantiene en memoria mientras el servidor está activo.</p>
+  <form class="entry-form" method="POST" action="/submit">
+    <label for="itemName">Nombre del item</label>
+    <input id="itemName" name="itemName" type="text" required maxlength="120">
+    <label for="itemCost">Costo</label>
+    <input id="itemCost" name="itemCost" type="text" inputmode="decimal" autocomplete="off" required>
+    <button class="primary-button" type="submit">Agregar</button>
+  </form>
+  <div class="toolbar">
+    <form method="GET" action="/export">
+      <button class="secondary-button" type="submit">Descargar CSV</button>
+    </form>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Item</th><th>Costo</th><th>Acciones</th></tr></thead>
+    <tbody>
+{{items_rows}}
+    </tbody>
+    <tfoot><tr><td colspan="3">Total</td><td>{{total_cost}}</td></tr></tfoot>
+  </table>
+  <script src="/static/formatter.js"></script>
+</body>
+</html>

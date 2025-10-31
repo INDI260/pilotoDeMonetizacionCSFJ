@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Piloto de Monetización CSFJ — Editar item</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <h1>Editar item</h1>
+  <p class="lead">Actualiza la información del item seleccionado y guarda los cambios para que se reflejen en el listado.</p>
+  <form class="entry-form" method="POST" action="/update">
+    <input type="hidden" name="itemIndex" value="{{item_index}}">
+    <label for="itemName">Nombre del item</label>
+    <input id="itemName" name="itemName" type="text" required maxlength="120" value="{{item_name}}">
+    <label for="editItemCost">Costo</label>
+    <input id="editItemCost" name="itemCost" type="text" inputmode="decimal" autocomplete="off" required value="{{item_cost}}">
+    <button class="primary-button" type="submit">Guardar cambios</button>
+  </form>
+  <a class="link-button" href="/">Cancelar y volver al listado</a>
+  <script src="/static/formatter.js"></script>
+</body>
+</html>

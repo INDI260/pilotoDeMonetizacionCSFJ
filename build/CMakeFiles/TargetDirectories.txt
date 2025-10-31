@@ -1,3 +1,0 @@
-C:/Users/aleca/Downloads/pilotoMonetizacionCSFJ/build/CMakeFiles/item_form_server.dir
-C:/Users/aleca/Downloads/pilotoMonetizacionCSFJ/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/aleca/Downloads/pilotoMonetizacionCSFJ/build/CMakeFiles/ZERO_CHECK.dir
