@@ -10,9 +10,28 @@
   <p class="lead">Actualiza la información del item seleccionado y guarda los cambios para que se reflejen en el listado.</p>
   <form class="entry-form" method="POST" action="/update">
     <input type="hidden" name="itemIndex" value="{{item_index}}">
-    <label for="itemName">Nombre del item</label>
-    <input id="itemName" name="itemName" type="text" required maxlength="120" value="{{item_name}}">
-    <label for="editItemCost">Costo</label>
+    <label for="itemNameSelect">Nombre del item</label>
+    <select id="itemNameSelect" name="itemNameSelect" required>
+      <option value="">-- Selecciona un item --</option>
+      <option value="Hora docente">Hora docente</option>
+      <option value="Viáticos">Viáticos</option>
+      <option value="Transporte">Transporte</option>
+      <option value="Material didáctico">Material didáctico</option>
+      <option value="Refrigerio">Refrigerio</option>
+      <option value="Alquiler de espacio">Alquiler de espacio</option>
+      <option value="Equipamiento">Equipamiento</option>
+      <option value="Servicios profesionales">Servicios profesionales</option>
+      <option value="Publicidad">Publicidad</option>
+      <option value="Certificaciones">Certificaciones</option>
+      <option value="Otro...">Otro...</option>
+    </select>
+    <div id="customItemContainer" style="display: none;">
+      <label for="itemName">Nombre personalizado</label>
+      <input id="itemName" name="itemName" type="text" maxlength="120" data-current-name="{{item_name}}">
+    </div>
+    <label for="itemQuantity">Cantidad</label>
+    <input id="itemQuantity" name="itemQuantity" type="number" min="1" required value="{{item_quantity}}">
+    <label for="editItemCost">Costo unitario</label>
     <input id="editItemCost" name="itemCost" type="text" inputmode="decimal" autocomplete="off" required value="{{item_cost}}">
     <button class="primary-button" type="submit">Guardar cambios</button>
   </form>

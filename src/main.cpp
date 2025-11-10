@@ -36,7 +36,12 @@ constexpr int kSocketBufferSize = 4096;
 
 struct Item {
   std::string name;
-  double cost;
+  int quantity;
+  double unitCost;
+  
+  double getTotalCost() const {
+    return quantity * unitCost;
+  }
 };
 
 std::vector<Item> g_items;
@@ -282,12 +287,15 @@ std::string renderItemsTable() {
     std::lock_guard<std::mutex> guard(g_itemsMutex);
     for (size_t index = 0; index < g_items.size(); ++index) {
       const Item& item = g_items[index];
+      const double itemTotal = item.getTotalCost();
       rows << "      <tr><td>" << (index + 1) << "</td><td>" << escapeHtml(item.name)
-           << "</td><td>" << formatCurrencyWithGrouping(item.cost)
+           << "</td><td>" << item.quantity
+           << "</td><td>" << formatCurrencyWithGrouping(item.unitCost)
+           << "</td><td>" << formatCurrencyWithGrouping(itemTotal)
            << "</td><td class=\"actions\"><form class=\"action-form\" method=\"GET\" action=\"/edit\">"
            << "<input type=\"hidden\" name=\"index\" value=\"" << index << "\">"
            << "<button class=\"action-button\" type=\"submit\">Editar</button></form></td></tr>\n";
-      totalCost += item.cost;
+      totalCost += itemTotal;
     }
   }
 
@@ -314,7 +322,8 @@ std::string renderEditPage(size_t index, const Item& item) {
 
   replaceAll(page, "{{item_index}}", std::to_string(index));
   replaceAll(page, "{{item_name}}", escapeHtml(item.name));
-  replaceAll(page, "{{item_cost}}", formatCurrency(item.cost));
+  replaceAll(page, "{{item_quantity}}", std::to_string(item.quantity));
+  replaceAll(page, "{{item_cost}}", formatCurrency(item.unitCost));
 
   return page;
 }
@@ -367,13 +376,41 @@ bool tryServeStaticAsset(const std::string& path, SOCKET client) {
 
 void handlePostSubmit(const std::string& body, SOCKET client) {
   const auto formValues = parseFormBody(body);
-  const auto nameIt = formValues.find("itemName");
+  
+  // Get item name from dropdown or custom field
+  std::string itemName;
+  const auto selectIt = formValues.find("itemNameSelect");
+  if (selectIt != formValues.end() && !selectIt->second.empty()) {
+    if (selectIt->second == "Otro...") {
+      const auto customIt = formValues.find("itemName");
+      if (customIt != formValues.end()) {
+        itemName = customIt->second;
+      }
+    } else {
+      itemName = selectIt->second;
+    }
+  }
+  
   const auto costIt = formValues.find("itemCost");
-  if (nameIt == formValues.end() || costIt == formValues.end()) {
+  const auto quantityIt = formValues.find("itemQuantity");
+  if (itemName.empty() || costIt == formValues.end() || quantityIt == formValues.end()) {
     const std::string message = "Faltan campos requeridos.";
     sendResponse(client, "HTTP/1.1 400 Bad Request", "text/plain; charset=utf-8", message);
     return;
   }
+  
+  int quantity = 0;
+  try {
+    quantity = std::stoi(quantityIt->second);
+    if (quantity < 1) {
+      throw std::invalid_argument("quantity must be positive");
+    }
+  } catch (const std::exception&) {
+    const std::string message = "Cantidad inválida. Debe ser un número entero positivo.";
+    sendResponse(client, "HTTP/1.1 400 Bad Request", "text/plain; charset=utf-8", message);
+    return;
+  }
+  
   try {
     const std::string normalizedCost = normalizeCostInput(costIt->second);
     if (normalizedCost.empty()) {
@@ -385,7 +422,7 @@ void handlePostSubmit(const std::string& body, SOCKET client) {
     }
     {
       std::lock_guard<std::mutex> guard(g_itemsMutex);
-      g_items.push_back({nameIt->second, cost});
+      g_items.push_back({itemName, quantity, cost});
     }
     sendRedirect(client, "/");
   } catch (const std::exception&) {
@@ -397,9 +434,24 @@ void handlePostSubmit(const std::string& body, SOCKET client) {
 void handlePostUpdate(const std::string& body, SOCKET client) {
   const auto formValues = parseFormBody(body);
   const auto indexIt = formValues.find("itemIndex");
-  const auto nameIt = formValues.find("itemName");
+  
+  // Get item name from dropdown or custom field
+  std::string itemName;
+  const auto selectIt = formValues.find("itemNameSelect");
+  if (selectIt != formValues.end() && !selectIt->second.empty()) {
+    if (selectIt->second == "Otro...") {
+      const auto customIt = formValues.find("itemName");
+      if (customIt != formValues.end()) {
+        itemName = customIt->second;
+      }
+    } else {
+      itemName = selectIt->second;
+    }
+  }
+  
   const auto costIt = formValues.find("itemCost");
-  if (indexIt == formValues.end() || nameIt == formValues.end() || costIt == formValues.end()) {
+  const auto quantityIt = formValues.find("itemQuantity");
+  if (indexIt == formValues.end() || itemName.empty() || costIt == formValues.end() || quantityIt == formValues.end()) {
     const std::string message = "Faltan campos requeridos.";
     sendResponse(client, "HTTP/1.1 400 Bad Request", "text/plain; charset=utf-8", message);
     return;
@@ -410,6 +462,18 @@ void handlePostUpdate(const std::string& body, SOCKET client) {
     itemIndex = static_cast<size_t>(std::stoul(indexIt->second));
   } catch (const std::exception&) {
     const std::string message = "Índice de item inválido.";
+    sendResponse(client, "HTTP/1.1 400 Bad Request", "text/plain; charset=utf-8", message);
+    return;
+  }
+  
+  int quantity = 0;
+  try {
+    quantity = std::stoi(quantityIt->second);
+    if (quantity < 1) {
+      throw std::invalid_argument("quantity must be positive");
+    }
+  } catch (const std::exception&) {
+    const std::string message = "Cantidad inválida. Debe ser un número entero positivo.";
     sendResponse(client, "HTTP/1.1 400 Bad Request", "text/plain; charset=utf-8", message);
     return;
   }
@@ -430,7 +494,7 @@ void handlePostUpdate(const std::string& body, SOCKET client) {
       if (itemIndex >= g_items.size()) {
         itemMissing = true;
       } else {
-        g_items[itemIndex] = {nameIt->second, cost};
+        g_items[itemIndex] = {itemName, quantity, cost};
       }
     }
 
@@ -535,18 +599,22 @@ void handleClient(SOCKET client) {
     sendResponse(client, "HTTP/1.1 200 OK", "text/html; charset=utf-8", html);
   } else if (method == "GET" && path == "/export") {
     std::ostringstream csv;
-    csv << "Nombre,Costo\r\n";
+    csv << "Nombre,Cantidad,Costo Unitario,Total\r\n";
 
     double totalCost = 0.0;
     {
       std::lock_guard<std::mutex> guard(g_itemsMutex);
       for (const Item& item : g_items) {
-        csv << escapeCsv(item.name) << ',' << escapeCsv(formatCurrency(item.cost)) << "\r\n";
-        totalCost += item.cost;
+        const double itemTotal = item.getTotalCost();
+        csv << escapeCsv(item.name) << ',' 
+            << item.quantity << ','
+            << escapeCsv(formatCurrency(item.unitCost)) << ','
+            << escapeCsv(formatCurrency(itemTotal)) << "\r\n";
+        totalCost += itemTotal;
       }
     }
 
-    csv << escapeCsv("Total") << ',' << escapeCsv(formatCurrency(totalCost)) << "\r\n";
+    csv << escapeCsv("Total") << ",,," << escapeCsv(formatCurrency(totalCost)) << "\r\n";
 
     const auto csvBody = csv.str();
     const std::string disposition = "Content-Disposition: attachment; filename=\"items.csv\"\r\n";

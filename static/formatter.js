@@ -57,5 +57,43 @@
   document.addEventListener('DOMContentLoaded', () => {
     attachFormatter('itemCost');
     attachFormatter('editItemCost');
+    
+    // Handle dropdown change for item name selection
+    const itemNameSelect = document.getElementById('itemNameSelect');
+    const customItemContainer = document.getElementById('customItemContainer');
+    const customItemInput = document.getElementById('itemName');
+    
+    if (itemNameSelect && customItemContainer && customItemInput) {
+      itemNameSelect.addEventListener('change', function() {
+        if (this.value === 'Otro...') {
+          customItemContainer.style.display = 'block';
+          customItemInput.required = true;
+          customItemInput.focus();
+        } else {
+          customItemContainer.style.display = 'none';
+          customItemInput.required = false;
+          customItemInput.value = '';
+        }
+      });
+      
+      // For edit page: check if current item is in the list
+      const currentItemName = customItemInput.getAttribute('data-current-name');
+      if (currentItemName) {
+        let found = false;
+        for (let i = 0; i < itemNameSelect.options.length; i++) {
+          if (itemNameSelect.options[i].value === currentItemName) {
+            itemNameSelect.value = currentItemName;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          itemNameSelect.value = 'Otro...';
+          customItemContainer.style.display = 'block';
+          customItemInput.required = true;
+          customItemInput.value = currentItemName;
+        }
+      }
+    }
   });
 })();

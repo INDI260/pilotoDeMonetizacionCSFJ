@@ -9,9 +9,28 @@
   <h1>Piloto de Monetización CSFJ</h1>
   <p class="lead">Registra los items y sus costos asociados. Toda la información se mantiene en memoria mientras el servidor está activo.</p>
   <form class="entry-form" method="POST" action="/submit">
-    <label for="itemName">Nombre del item</label>
-    <input id="itemName" name="itemName" type="text" required maxlength="120">
-    <label for="itemCost">Costo</label>
+    <label for="itemNameSelect">Nombre del item</label>
+    <select id="itemNameSelect" name="itemNameSelect" required>
+      <option value="">-- Selecciona un item --</option>
+      <option value="Hora docente">Hora docente</option>
+      <option value="Viáticos">Viáticos</option>
+      <option value="Transporte">Transporte</option>
+      <option value="Material didáctico">Material didáctico</option>
+      <option value="Refrigerio">Refrigerio</option>
+      <option value="Alquiler de espacio">Alquiler de espacio</option>
+      <option value="Equipamiento">Equipamiento</option>
+      <option value="Servicios profesionales">Servicios profesionales</option>
+      <option value="Publicidad">Publicidad</option>
+      <option value="Certificaciones">Certificaciones</option>
+      <option value="Otro...">Otro...</option>
+    </select>
+    <div id="customItemContainer" style="display: none;">
+      <label for="itemName">Nombre personalizado</label>
+      <input id="itemName" name="itemName" type="text" maxlength="120">
+    </div>
+    <label for="itemQuantity">Cantidad</label>
+    <input id="itemQuantity" name="itemQuantity" type="number" min="1" value="1" required>
+    <label for="itemCost">Costo unitario</label>
     <input id="itemCost" name="itemCost" type="text" inputmode="decimal" autocomplete="off" required>
     <button class="primary-button" type="submit">Agregar</button>
   </form>
@@ -21,11 +40,11 @@
     </form>
   </div>
   <table>
-    <thead><tr><th>#</th><th>Item</th><th>Costo</th><th>Acciones</th></tr></thead>
+    <thead><tr><th>#</th><th>Item</th><th>Cantidad</th><th>Costo Unitario</th><th>Total</th><th>Acciones</th></tr></thead>
     <tbody>
 {{items_rows}}
     </tbody>
-    <tfoot><tr><td colspan="3">Total</td><td>{{total_cost}}</td></tr></tfoot>
+    <tfoot><tr><td colspan="5">Total</td><td>{{total_cost}}</td></tr></tfoot>
   </table>
   <script src="/static/formatter.js"></script>
 </body>
