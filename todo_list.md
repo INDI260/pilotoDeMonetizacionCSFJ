@@ -1,8 +1,0 @@
-- [x] Plan project structure and requirements
-- [x] Scaffold C++ web app files (source, headers, build setup)
-- [x] Implement web server with form handling logic
-- [x] Add README with build/run instructions
-- [x] Build project locally
-- [x] Run basic manual test (if build succeeds)
-- [x] Update page title to "Piloto de Monetización CSFJ"
-- [x] Add edit button functionality for each item
